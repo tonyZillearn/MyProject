@@ -5,22 +5,78 @@ on:
       - 'master'
   pull_request:
 
+
 jobs:
-  run-tests:
-   runs-on: ubuntu-18.04
+
+  tests:
+    runs-on: ubuntu-20.04
     steps:
       - name: Checkout
         uses: actions/checkout@v2
 
-      - name: Cypress tests
-        # normally you would write
-        # uses: cypress-io/github-action@v2
+      - name: Cypress info
         uses: ./
-        # the parameters below are only necessary
-        # because we are running these examples in a monorepo
         with:
-          working-directory: '*integration/Weather.spec.js'
           # just for full picture after installing Cypress
           # print information about detected browsers, etc
           # see https://on.cypress.io/command-line#cypress-info
           build: npx cypress info
+          working-directory: examples/v9/chrome
+
+      - name: Electron
+        uses: ./
+        with:
+          working-directory: examples/v9/chrome
+
+      # store screenshot captured during the test
+      - uses: actions/upload-artifact@v2
+        with:
+          name: screenshots-in-electron
+          path: examples/chrome/cypress/screenshots
+
+      - run: npx image-size cypress/screenshots/**/*.png
+        working-directory: examples/v9/chrome
+
+      - name: Chrome
+        uses: ./
+        with:
+          working-directory: examples/v9/chrome
+          browser: chrome
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: screenshots-in-chrome
+          path: examples/chrome/cypress/screenshots
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: video-in-chrome
+          path: examples/chrome/cypress/videos
+
+      - run: npx image-size cypress/screenshots/**/*.png
+        working-directory: examples/v9/chrome
+
+      # I wonder if GH Actions VM includes any of the tools that
+      # can tell us the resolution of a video file
+      - run: ffprobe cypress/videos/*.mp4 || true
+      - run: mplayer -really-quiet -ao null -vo null -identify -frames 0 cypress/videos/*.mp4 || true
+
+      - name: Chrome headed
+        uses: ./
+        with:
+          working-directory: examples/v9/chrome
+          browser: chrome
+          headed: true
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: screenshots-in-headed-chrome
+          path: examples/chrome/cypress/screenshots
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: video-in-headed-chrome
+          path: examples/chrome/cypress/videos
+
+      - run: npx image-size cypress/screenshots/**/*.png
+        working-directory: examples/v9/chrome
