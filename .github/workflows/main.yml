@@ -1,36 +1,26 @@
 name: Run Tests
-on: push
+on:
+  push:
+    branches:
+      - 'master'
+  pull_request:
 
 jobs:
   run-tests:
-    runs-on: ubuntu-latest
-    container: cypress/browsers:node14.17.0-chrome91-ff89
-    strategy:
-      matrix:
-        browser: [chrome, electron]
+   runs-on: ubuntu-18.04
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v2
 
-      - run: |
-          npm i
-          npm run cy:run:${{ matrix.browser }}
-
-      - uses: actions/upload-artifact@v2
+      - name: Cypress tests
+        # normally you would write
+        # uses: cypress-io/github-action@v2
+        uses: ./
+        # the parameters below are only necessary
+        # because we are running these examples in a monorepo
         with:
-          name: reports
-          path: junit/*.xml
-
-
-  generate-reports:
-    needs: run-tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v2
-        with:
-          name: reports
-
-      - name: Publish Unit Test Results
-        uses: EnricoMi/publish-unit-test-result-action@v1
-        if: always()
-        with:
-          files: ./*.xml
+          working-directory: '*integration/Weather.spec.js'
+          # just for full picture after installing Cypress
+          # print information about detected browsers, etc
+          # see https://on.cypress.io/command-line#cypress-info
+          build: npx cypress info
