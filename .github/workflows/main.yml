@@ -1,82 +1,49 @@
 name: Run Tests
-on:
-  push:
-    branches:
-      - 'master'
-  pull_request:
-
+on: push
 
 jobs:
-
-  tests:
-    runs-on: ubuntu-20.04
+  find-specs:
+    runs-on: ubuntu-latest
+    outputs:
+      files: ${{ steps.get-files.outputs.files }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
+     - uses: actions/checkout@v2
+     - id: get-files
+       run: |
+        npm ci
+        echo "::set-output name=files::$(node get_spec.js)"
 
-      - name: Cypress info
-        uses: ./
-        with:
-          # just for full picture after installing Cypress
-          # print information about detected browsers, etc
-          # see https://on.cypress.io/command-line#cypress-info
-          build: npx cypress info
-          working-directory: examples/v9/chrome
+  run-tests:
+    runs-on: ubuntu-latest
+    needs: find-specs
+    container: cypress/browsers:node14.19.0-chrome100-ff99-edge
+    strategy:
+      matrix:
+        browser: [chrome, electron, edge]
+        spec: ${{ fromJSON(needs.find-specs.outputs.files) }}
+    steps:
+      - uses: actions/checkout@v2
 
-      - name: Electron
-        uses: ./
-        with:
-          working-directory: examples/v9/chrome
-
-      # store screenshot captured during the test
-      - uses: actions/upload-artifact@v2
-        with:
-          name: screenshots-in-electron
-          path: examples/chrome/cypress/screenshots
-
-      - run: npx image-size cypress/screenshots/**/*.png
-        working-directory: examples/v9/chrome
-
-      - name: Chrome
-        uses: ./
-        with:
-          working-directory: examples/v9/chrome
-          browser: chrome
+      - run: |
+          npm ci
+          npm run cy:run:${{ matrix.browser }} -- --spec ${{ matrix.spec }}
 
       - uses: actions/upload-artifact@v2
         with:
-          name: screenshots-in-chrome
-          path: examples/chrome/cypress/screenshots
+          name: reports
+          path: junit/*.xml
 
-      - uses: actions/upload-artifact@v2
+
+  generate-reports:
+    needs: run-tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v2
         with:
-          name: video-in-chrome
-          path: examples/chrome/cypress/videos
+          name: reports
 
-      - run: npx image-size cypress/screenshots/**/*.png
-        working-directory: examples/v9/chrome
-
-      # I wonder if GH Actions VM includes any of the tools that
-      # can tell us the resolution of a video file
-      - run: ffprobe cypress/videos/*.mp4 || true
-      - run: mplayer -really-quiet -ao null -vo null -identify -frames 0 cypress/videos/*.mp4 || true
-
-      - name: Chrome headed
-        uses: ./
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action@v1
+        if: always()
         with:
-          working-directory: examples/v9/chrome
-          browser: chrome
-          headed: true
-
-      - uses: actions/upload-artifact@v2
-        with:
-          name: screenshots-in-headed-chrome
-          path: examples/chrome/cypress/screenshots
-
-      - uses: actions/upload-artifact@v2
-        with:
-          name: video-in-headed-chrome
-          path: examples/chrome/cypress/videos
-
-      - run: npx image-size cypress/screenshots/**/*.png
-        working-directory: examples/v9/chrome
+          files: ./*.xml
