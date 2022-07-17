@@ -20,7 +20,7 @@ jobs:
     strategy:
       matrix:
         browser: [chrome, electron, edge]
-        spec: ${{ needs.find-specs.outputs.files }}
+        spec: ${{fromJSON(needs.find-specs.outputs.files)}}
     steps:
       - uses: actions/checkout@v2
 
